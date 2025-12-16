@@ -49,7 +49,7 @@ struct Paciente {
 
   // Datos Clinicos
   string motivoConsulta;
-  NivelUrgencia nivelUrgencia;
+  NivelUrgencia urgencia;
 
   // Control administrativo
   int numLlegada;
