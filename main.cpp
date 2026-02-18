@@ -1,253 +1,393 @@
 #include <iostream>
-#include <limits> // Para limpiar buffer
+#include <vector>
+#include <string>
+#include <cstdlib>
+#include <ctime>
+
+// --- INCLUSIÓN DE MÓDULOS ---
 #include "estructuras.h"
-#include "AVL.h"
-#include "laboratorio.h"
-#include "historia.h"
-#include "citas.h"
-#include "hospital.h"
+#include "interfaz.h"      // Motor gráfico y Dashboard
+#include "AVL.h"           // Módulo 1: Triaje
+#include "historia.h"      // Módulo 2: Historias (Cerebro)
+#include "citas.h"         // Módulo 3: Citas
+#include "hospital.h"      // Módulo 4: Hospitalización
+#include "laboratorio.h"   // Módulo 5: Laboratorio
 
 using namespace std;
 
-// --- ESTRUCTURAS GLOBALES DEL SISTEMA ---
-Nodo* colaTriaje = NULL;         // Módulo 1 (AVL)
-ColaLaboratorio colaLab;            // Módulo 5 (Cola)
-NodoPila* pilaResultados = NULL;    // Módulo 5 (Pila)
-TablaHash agendaCitas;              // Módulo 3 (Hash)
-Hospital hospitalCentral;           // Módulo 4 (Matriz Dispersa)
+// --- VARIABLES GLOBALES (ESTADO DEL SISTEMA) ---
+// Definidas como extern en interfaz.h, aquí las instanciamos
+Nodo* colaTriaje = NULL;        
+ColaLaboratorio colaLab;        
+PilaLaboratorio pilaResultados; 
+TablaHash agendaCitas;          
+Hospital hospitalCentral;       
 
-// Simulación de Base de Datos de Historias (Array simple)
-const int MAX_EXPEDIENTES = 50;
+// Base de Datos de Expedientes (Array de Punteros)
+const int MAX_EXPEDIENTES = 100;
 Expediente* dbExpedientes[MAX_EXPEDIENTES];
 int cantExpedientes = 0;
 
-// --- FUNCIONES AUXILIARES ---
-
-void pausar() {
-    cout << "\nPresione ENTER para continuar...";
-    cin.ignore();
-    cin.get();
+// --- FUNCIÓN PUENTE (NEXO ENTRE MÓDULOS) ---
+// Busca el expediente de un paciente. Si no existe, lo crea.
+Expediente* obtenerExpediente(Paciente p) {
+    // 1. Buscar si ya existe
+    for(int i=0; i<cantExpedientes; i++) {
+        if(dbExpedientes[i]->datosPaciente.cedula == p.cedula) {
+            return dbExpedientes[i];
+        }
+    }
+    // 2. Si no existe, crear uno nuevo
+    if(cantExpedientes < MAX_EXPEDIENTES) {
+        dbExpedientes[cantExpedientes] = crearExpediente(p);
+        cantExpedientes++;
+        return dbExpedientes[cantExpedientes-1];
+    }
+    return NULL; // Base de datos llena (caso extremo)
 }
 
-// Busca un expediente existente o crea uno nuevo si no existe
-Expediente* buscarOcrearExpediente(string cedula, string nombre) {
+// Sobrecarga para buscar solo por cédula (si no tenemos el objeto Paciente completo)
+Expediente* buscarExpedienteSoloCedula(string cedula) {
     for(int i=0; i<cantExpedientes; i++) {
         if(dbExpedientes[i]->datosPaciente.cedula == cedula) {
             return dbExpedientes[i];
         }
     }
-    if(cantExpedientes < MAX_EXPEDIENTES) {
-        Paciente p; p.cedula = cedula; p.nombre = nombre;
-        dbExpedientes[cantExpedientes] = crearExpediente(p);
-        cantExpedientes++;
-        return dbExpedientes[cantExpedientes-1];
-    }
     return NULL;
 }
 
-// --- MENÚS POR MÓDULO ---
+// --- CONTROLADORES DE FLUJO ---
 
-void menuTriaje() {
-    int opc;
-    do {
-        cout << "\n--- MODULO 1: TRIAJE (EMERGENCIAS) ---" << endl;
-        cout << "1. Ingresar Paciente (Recepcion)" << endl;
-        cout << "2. Ver Cola de Espera (Prioridad AVL)" << endl;
-        cout << "3. Atender Paciente (Pasar a consulta)" << endl;
-        cout << "0. Volver" << endl;
-        cout << "Opcion: "; cin >> opc;
-
-        if (opc == 1) {
-            Paciente p;
-            int urg;
-            cout << "Cedula: "; cin >> p.cedula;
-            cin.ignore(); 
-            cout << "Nombre: "; getline(cin, p.nombre);
-            cout << "Motivo: "; getline(cin, p.motivoConsulta);
-            cout << "Nivel Urgencia (0:Critico, 1:Urgente, 2:Mod, 3:Leve): "; cin >> urg;
-            p.urgencia = (NivelUrgencia)urg;
-            cout << "Numero llegada (ej. 1, 2...): "; cin >> p.numLlegada;
-            
-            insertarPaciente(colaTriaje, p);
-        }
-        else if (opc == 2) {
-            cout << "\nPacientes en espera (Ordenados por Gravedad):" << endl;
-            mostrarArbol(colaTriaje, 1); // 1 = Inorden (De menor a mayor valor numérico = Mayor prioridad)
-        }
-        else if (opc == 3) {
-            eliminarPacienteMayorPrioridad(colaTriaje);
-        }
-    } while(opc != 0);
-}
-
-void menuCitas() {
-    int opc;
-    do {
-        cout << "\n--- MODULO 3: GESTION DE CITAS (HASH) ---" << endl;
-        cout << "1. Agendar Nueva Cita" << endl;
-        cout << "2. Ver Agenda Completa" << endl;
-        cout << "3. Cancelar Cita" << endl;
-        cout << "0. Volver" << endl;
-        cout << "Opcion: "; cin >> opc;
-
-        if (opc == 1) {
-            Cita c;
-            cout << "Cedula Paciente: "; cin >> c.idPaciente;
-            cin.ignore();
-            cout << "Nombre Medico: "; getline(cin, c.nombreMedico);
-            cout << "Especialidad: "; getline(cin, c.especialidad);
-            cout << "Fecha (D M A): "; cin >> c.fecha.dia >> c.fecha.mes >> c.fecha.anio;
-            cout << "Hora (0-23): "; cin >> c.hora.hora; c.hora.minuto = 0;
-            c.activa = true;
-            registrarCita(agendaCitas, c);
-        }
-        else if (opc == 2) {
-            mostrarTodaLaAgenda(agendaCitas);
-        }
-        else if (opc == 3) {
-            string ced; Fecha f; Hora h;
-            cout << "Cedula: "; cin >> ced;
-            cout << "Fecha (D M A): "; cin >> f.dia >> f.mes >> f.anio;
-            cout << "Hora: "; cin >> h.hora;
-            cancelarCita(agendaCitas, ced, f, h);
-        }
-    } while(opc != 0);
-}
-
-void menuHospital() {
-    int opc;
-    do {
-        cout << "\n--- MODULO 4: HOSPITALIZACION (MATRIZ) ---" << endl;
-        cout << "1. Ingresar Paciente a Cama" << endl;
-        cout << "2. Ver Mapa de Camas (Ocupadas)" << endl;
-        cout << "3. Ver Camas Libres" << endl;
-        cout << "4. Dar de Alta" << endl;
-        cout << "0. Volver" << endl;
-        cout << "Opcion: "; cin >> opc;
-
-        if (opc == 1) {
-            Paciente p; Fecha f; int piso, hab, tipo;
-            cout << "Cedula: "; cin >> p.cedula;
-            cin.ignore();
-            cout << "Nombre: "; getline(cin, p.nombre);
-            cout << "Fecha Ingreso (D M A): "; cin >> f.dia >> f.mes >> f.anio;
-            cout << "Tipo (0:Indiv, 3:Doble...): "; cin >> tipo;
-            cout << "Piso (1-5): "; cin >> piso;
-            cout << "Habitacion (1-10): "; cin >> hab;
-            
-            ingresarPaciente(hospitalCentral, p, f, (TipoHabitacion)tipo, piso, hab);
-        }
-        else if (opc == 2) mostrarHabitacionesOcupadas(hospitalCentral);
-        else if (opc == 3) mostrarHabitacionesLibres(hospitalCentral);
-        else if (opc == 4) {
-            int p, h;
-            cout << "Piso: "; cin >> p;
-            cout << "Habitacion: "; cin >> h;
-            darAltaPaciente(hospitalCentral, p, h);
-        }
-    } while(opc != 0);
-}
-
-void menuLaboratorio() {
-    int opc;
-    do {
-        cout << "\n--- MODULO 5: LABORATORIO (COLA/PILA) ---" << endl;
-        cout << "1. Registrar Solicitud de Examen" << endl;
-        cout << "2. Procesar Siguiente Examen (Bioanalista)" << endl;
-        cout << "3. Ver Historial Resultados" << endl;
-        cout << "0. Volver" << endl;
-        cout << "Opcion: "; cin >> opc;
-
-        if (opc == 1) {
-            Examen ex;
-            cout << "Cedula Paciente: "; cin >> ex.cedulaPaciente;
-            ex.fechaSolicitud = {1,1,2025}; // Fecha dummy por rapidez
-            ex.procesado = false;
-            encolarSolicitud(colaLab, ex);
-        }
-        else if (opc == 2) {
-            string res;
-            cout << "Ingrese resultado del analisis: ";
-            cin.ignore(); getline(cin, res);
-            procesarExamen(colaLab, pilaResultados, res);
-        }
-        else if (opc == 3) mostrarPila(pilaResultados);
-    } while(opc != 0);
-}
-
-void menuHistorias() {
-    cout << "\n--- MODULO 2: HISTORIAS CLINICAS (LISTA DOBLE) ---" << endl;
-    string ced, nom;
-    cout << "Ingrese Cedula del Paciente a consultar: "; cin >> ced;
-    
-    // Buscar o crear dummy para no complicar el flujo
-    Expediente* exp = buscarOcrearExpediente(ced, "Paciente (Sin Nombre Registrado)");
-    
-    int opc;
-    do {
-        cout << "\n Expediente: " << exp->datosPaciente.cedula << endl;
-        cout << "1. Agregar Consulta Medica" << endl;
-        cout << "2. Ver Historia Completa" << endl;
-        cout << "3. Buscar Consulta por Fecha (Recursivo)" << endl;
-        cout << "0. Volver" << endl;
-        cout << "Opcion: "; cin >> opc;
+void controladorTriaje() {
+    while(true) {
+        vector<string> ops = {
+            "Registrar Paciente (Llegada)", 
+            "Ver Sala de Espera (Prioridad)", 
+            "ATENDER PACIENTE (Pasar a Consulta)", 
+            "Volver al Menu Principal"
+        };
         
-        if (opc == 1) {
-            Fecha f; string d, t, o;
-            cout << "Fecha (D M A): "; cin >> f.dia >> f.mes >> f.anio;
-            cin.ignore();
-            cout << "Diagnostico: "; getline(cin, d);
-            cout << "Tratamiento: "; getline(cin, t);
-            cout << "Observaciones: "; getline(cin, o);
-            agregarRegistroMedico(exp, f, d, t, o);
+        int sel = menuInteractivo("TRIAJE DE EMERGENCIAS", ops);
+
+        if (sel == 0) { // Registrar
+            limpiarAreaTrabajo();
+            gotoxy(5, 5); cout << "--- NUEVO INGRESO A TRIAJE ---";
+            
+            Paciente p;
+            
+            // 1. Validaciones de Texto (No vacíos) usando el nuevo inputTexto
+            p.cedula = inputTexto("Cedula: ", 7);
+            p.nombre = inputTexto("Nombre Completo: ", 9);
+            p.motivoConsulta = inputTexto("Motivo Consulta: ", 11);
+            
+            // 2. Validación de Urgencia (Estricta 0-3) usando inputNumero con rango
+            gotoxy(5, 13); cout << "Niveles: 0:Critico | 1:Urgente | 2:Moderado | 3:Leve";
+            int u = inputNumero("Indique Nivel de Urgencia (0-3): ", 14, 0, 3);
+            p.urgencia = (NivelUrgencia)u;
+            
+            p.numLlegada = rand() % 1000; 
+            
+            // Inserción y creación de expediente
+            insertarPaciente(colaTriaje, p);
+            obtenerExpediente(p);
+            
+            mostrarMensajeExito("Paciente registrado correctamente.");
         }
-        else if (opc == 2) mostrarHistoriaClinica(exp);
-        else if (opc == 3) {
-            Fecha f;
-            cout << "Fecha a buscar (D M A): "; cin >> f.dia >> f.mes >> f.anio;
-            NodoHistoria* res = buscarRegistroPorFecha(exp->inicio, f);
-            if (res) cout << ">>> ENCONTRADO: " << res->diagnostico << " | Tratamiento: " << res->tratamiento << endl;
-            else cout << ">>> NO SE ENCONTRARON REGISTROS EN ESA FECHA." << endl;
+        else if (sel == 1) { // Ver Sala
+            limpiarAreaTrabajo();
+            gotoxy(5, 5); cout << "--- PACIENTES EN ESPERA (DETALLADO) ---";
+            gotoxy(5, 7);
+            // El dashboard muestra el resumen, aquí mostramos el detalle completo
+            if(colaTriaje == NULL) cout << "No hay pacientes.";
+            else mostrarArbol(colaTriaje, 1); 
+            pausarInterfaz();
         }
-    } while(opc != 0);
+        else if (sel == 2) { // Atender
+            if(colaTriaje == NULL) {
+                mostrarMensajeError("No hay pacientes en espera.");
+                continue;
+            }
+
+            Paciente pAtendido = colaTriaje->dato;
+            eliminarPacienteMayorPrioridad(colaTriaje);
+            
+            Expediente* exp = obtenerExpediente(pAtendido);
+            limpiarAreaTrabajo();
+            gotoxy(5, 5); cout << "ATENDIENDO A: " << pAtendido.nombre;
+            gotoxy(5, 6); cout << "Nivel: " << pAtendido.urgencia << " | Motivo: " << pAtendido.motivoConsulta;
+            
+            string diag = inputTexto("Diagnostico Medico: ", 8);
+            string trat = inputTexto("Tratamiento/Indicaciones: ", 10);
+            
+            agregarConsulta(exp, {1,1,2025}, diag, trat, "Atendido desde Emergencia");
+            mostrarMensajeExito("Consulta registrada.");
+
+            // Flujo de derivación
+            vector<string> opsFlujo = {"Dar de Alta (Casa)", "Enviar a Laboratorio", "Ingresar (Hospitalizar)"};
+            int destino = menuInteractivo("DESTINO DEL PACIENTE", opsFlujo);
+
+            if (destino == 1) { // Laboratorio
+                Examen ex;
+                ex.cedulaPaciente = pAtendido.cedula;
+                ex.nombrePaciente = pAtendido.nombre;
+                ex.fechaSolicitud = {1,1,2025};
+                ex.procesado = false;
+                ex.resultado = "PENDIENTE";
+                
+                limpiarAreaTrabajo();
+                gotoxy(5,5); cout << "SOLICITUD DE EXAMEN";
+                gotoxy(5,7); cout << "Tipos: 0:Hema, 1:Quim, 2:Imag, 3:Orina";
+                int t = inputNumero("Tipo de Examen (0-3): ", 9, 0, 3);
+                ex.tipo = (TipoExamen)t;
+                
+                if(!validarColaLaboratorio(colaLab, ex.cedulaPaciente)){
+                     encolarSolicitud(colaLab, ex);
+                     mostrarMensajeExito("Enviado a Laboratorio.");
+                } else {
+                     mostrarMensajeError("El paciente ya tiene solicitud pendiente.");
+                }
+            }
+            else if (destino == 2) { // Hospitalización
+                limpiarAreaTrabajo();
+                gotoxy(5,5); cout << "INGRESO HOSPITALARIO";
+                int piso = inputNumero("Asignar Piso (1-5): ", 7, 1, 5);
+                int hab = inputNumero("Asignar Habitacion (1-10): ", 9, 1, 10);
+                
+                if(ingresarPaciente(hospitalCentral, pAtendido, {1,1,2025}, CUIDADOS_ESPECIALES, piso, hab)) {
+                    string lugar = "Piso " + to_string(piso) + " - Hab " + to_string(hab);
+                    agregarIngreso(exp, {1,1,2025}, lugar, diag);
+                    mostrarMensajeExito("Paciente Ingresado.");
+                } else {
+                    mostrarMensajeError("No se pudo ingresar (Cama ocupada).");
+                }
+            }
+            else {
+                agregarAlta(exp, {1,1,2025}, "Alta rapida", "Reposo");
+                mostrarMensajeExito("Paciente dado de alta.");
+            }
+        }
+        else return;
+    }
+}
+
+void controladorLaboratorio() {
+    while(true) {
+        vector<string> ops = {
+            "Registrar Solicitud (Manual)", 
+            "PROCESAR MUESTRA (Cola -> Pila)", 
+            "Ver Historial Resultados", 
+            "Volver"
+        };
+        int sel = menuInteractivo("LABORATORIO CLINICO", ops);
+
+        if(sel == 0) { // Manual (Paciente externo)
+            limpiarAreaTrabajo();
+            Examen ex;
+            ex.cedulaPaciente = inputTexto("Cedula: ", 6);
+            ex.nombrePaciente = inputTexto("Nombre: ", 8);
+            int t = inputNumero("Tipo (0-4): ", 10, 0, 4);
+            ex.tipo = (TipoExamen)t;
+            ex.fechaSolicitud = {1,1,2025};
+            ex.procesado = false;
+            
+            // Crear expediente si no existe (es nuevo)
+            Paciente pDummy; pDummy.cedula = ex.cedulaPaciente; pDummy.nombre = ex.nombrePaciente;
+            obtenerExpediente(pDummy);
+
+            if(encolarSolicitud(colaLab, ex)) mostrarMensajeExito("Solicitud enviada.");
+        }
+        else if(sel == 1) { // PROCESAR (CONEXIÓN CON HISTORIA)
+            if(colaEstaVacia(colaLab)) {
+                mostrarMensajeError("No hay muestras pendientes.");
+            } else {
+                limpiarAreaTrabajo();
+                
+                // 1. Obtener puntero al dato actual
+                Examen* siguiente = &colaLab.ultimo->siguiente->datos;
+                
+                gotoxy(5, 5); cout << "PROCESANDO: " << siguiente->nombrePaciente;
+                gotoxy(5, 6); cout << "Examen: " << obtenerNombreExamen(siguiente->tipo);
+                
+                string res = inputTexto("Resultado del Analisis: ", 9);
+                
+                // --- CORRECCIÓN CRÍTICA AQUÍ ---
+                // Guardamos los datos en variables locales ANTES de que procesarExamen borre el nodo
+                string cedulaTemp = siguiente->cedulaPaciente;
+                TipoExamen tipoTemp = siguiente->tipo;
+                // -------------------------------
+
+                // 2. Procesar (Esto elimina el nodo de la cola y libera esa memoria)
+                procesarExamen(colaLab, pilaResultados, res);
+                
+                // 3. Guardar en Historia Clínica (Usando las variables temporales seguras)
+                Expediente* exp = buscarExpedienteSoloCedula(cedulaTemp); // Usamos cedulaTemp
+                
+                if(exp) {
+                    // Usamos tipoTemp
+                    agregarResultadoLab(exp, {1,1,2025}, obtenerNombreExamen(tipoTemp), res);
+                    mostrarMensajeExito("Procesado y guardado en Historia Clinica.");
+                } else {
+                    mostrarMensajeExito("Procesado (Paciente sin historia previa).");
+                }
+            }
+        }
+        else if(sel == 2) {
+            limpiarAreaTrabajo();
+            mostrarPila(pilaResultados);
+            pausarInterfaz();
+        }
+        else return;
+    }
+}
+
+void controladorHospital() {
+    while(true) {
+        vector<string> ops = {
+            "Ver Mapa de Camas", 
+            "Ver Disponibilidad", 
+            "DAR DE ALTA (Liberar Cama)",
+            "Volver"
+        };
+        int sel = menuInteractivo("HOSPITALIZACION", ops);
+
+        if (sel == 0) {
+            limpiarAreaTrabajo();
+            mostrarHabitacionesOcupadas(hospitalCentral);
+            pausarInterfaz();
+        }
+        else if (sel == 1) {
+            limpiarAreaTrabajo();
+            mostrarHabitacionesLibres(hospitalCentral);
+            pausarInterfaz();
+        }
+        else if (sel == 2) { // DAR DE ALTA (CONEXIÓN CON HISTORIA)
+            limpiarAreaTrabajo();
+            gotoxy(5, 5); cout << "--- PROCESO DE ALTA ---";
+            int p = inputNumero("Piso (1-5): ", 7, 1, 5);
+            int h = inputNumero("Habitacion (1-10): ", 9, 1, 10);
+            
+            // Buscar primero quién está ahí para el reporte
+            NodoMatriz* cama = buscarHabitacion(hospitalCentral, p, h);
+            
+            if(cama != NULL) {
+                string motivo = inputTexto("Motivo del Alta: ", 11);
+                string indic = inputTexto("Indicaciones: ", 13);
+                
+                // 1. Guardar en Historia
+                Expediente* exp = buscarExpedienteSoloCedula(cama->paciente.cedula);
+                if(exp) {
+                    agregarAlta(exp, {1,1,2025}, motivo, indic);
+                }
+                
+                // 2. Liberar Cama (Módulo 4)
+                darAltaPaciente(hospitalCentral, p, h);
+                mostrarMensajeExito("Paciente egresado y cama liberada.");
+            } else {
+                mostrarMensajeError("Esa habitacion ya esta vacia.");
+            }
+        }
+        else return;
+    }
+}
+
+void controladorHistorias() {
+    // Módulo de solo lectura y consultas
+    limpiarAreaTrabajo();
+    string ced = inputTexto("Ingrese Cedula a Consultar: ", 10);
+    
+    Expediente* exp = buscarExpedienteSoloCedula(ced);
+    
+    if(exp) {
+        limpiarAreaTrabajo();
+        // Nota: mostrarHistoriaClinica usa cout simple.
+        // Lo imprimimos en la posición inicial
+        gotoxy(2, 4);
+        mostrarHistoriaClinica(exp);
+    } else {
+        mostrarMensajeError("Paciente no tiene expediente.");
+    }
+    pausarInterfaz();
+}
+
+void controladorCitas() {
+    while(true) {
+        vector<string> ops = {"Agendar Cita", "Ver Agenda", "Cancelar Cita", "Volver"};
+        int sel = menuInteractivo("CONSULTAS Y CITAS", ops);
+        
+        if(sel == 0) {
+            limpiarAreaTrabajo();
+            Cita c;
+            c.idPaciente = inputTexto("Cedula: ", 6);
+            c.nombreMedico = inputTexto("Medico: ", 8);
+            c.fecha.dia = inputNumero("Dia (1-31): ", 10, 1, 31);
+            c.fecha.mes = 5; 
+            c.fecha.anio = 2025;
+            c.hora.hora = inputNumero("Hora (0-23): ", 13, 0, 23);
+            c.hora.minuto = 0;
+            
+            if(registrarCita(agendaCitas, c)) {
+                // Crear expediente preventivo
+                Paciente pDummy; pDummy.cedula = c.idPaciente; pDummy.nombre = "Paciente Cita";
+                obtenerExpediente(pDummy);
+                mostrarMensajeExito("Cita Agendada.");
+            } else {
+                mostrarMensajeError("Choque de Horario.");
+            }
+        }
+        else if(sel == 1) {
+            limpiarAreaTrabajo();
+            mostrarTablaHash(agendaCitas);
+            pausarInterfaz();
+        }
+        else if(sel == 2) {
+            limpiarAreaTrabajo();
+            string c = inputTexto("Cedula: ", 6);
+            cancelarCita(agendaCitas, c, {10,5,2025}, {9,0}); // Simplificado
+            pausarInterfaz();
+        }
+        else return;
+    }
 }
 
 // --- MAIN PRINCIPAL ---
 
 int main() {
-    // Inicializar todas las estructuras globales
-    inicializarCola(colaLab, 5);
+    // Configuración
+    ocultarCursor();
+    SetConsoleTitle("SISTEMA HOSPITALARIO V3.0 (INTEGRADO)");
+    srand(time(0));
+
+    // Inicializaciones
+    inicializarCola(colaLab);
+    inicializarPila(pilaResultados);
     inicializarTabla(agendaCitas);
     inicializarHospital(hospitalCentral);
 
-    int opcion;
-    do {
-        cout << "\n==========================================" << endl;
-        cout << " SISTEMA INTEGRAL DE GESTION HOSPITALARIA " << endl;
-        cout << "==========================================" << endl;
-        cout << "1. Modulo TRIAJE (Arbol AVL)" << endl;
-        cout << "2. Modulo HISTORIAS CLINICAS (Lista Doble)" << endl;
-        cout << "3. Modulo CITAS MEDICAS (Tabla Hash)" << endl;
-        cout << "4. Modulo HOSPITALIZACION (Matriz Dispersa)" << endl;
-        cout << "5. Modulo LABORATORIO (Cola/Pila)" << endl;
-        cout << "0. SALIR" << endl;
-        cout << "==========================================" << endl;
-        cout << "Seleccione una opcion: ";
-        cin >> opcion;
+    encabezado(); // Dibujar marco estático
 
-        switch (opcion) {
-            case 1: menuTriaje(); break;
-            case 2: menuHistorias(); break;
-            case 3: menuCitas(); break;
-            case 4: menuHospital(); break;
-            case 5: menuLaboratorio(); break;
-            case 0: cout << "Cerrando sistema..." << endl; break;
-            default: cout << "Opcion invalida." << endl;
+    while (true) {
+        vector<string> menu = {
+            "TRIAJE (Emergencias -> Ingresos)",
+            "HISTORIAS CLINICAS (Consultar)",
+            "CITAS MEDICAS (Hash Table)",
+            "HOSPITALIZACION (Pisos y Camas)",
+            "LABORATORIO (Colas y Resultados)",
+            "SALIR"
+        };
+
+        int sel = menuInteractivo("PANEL DE CONTROL GENERAL", menu);
+
+        switch (sel) {
+            case 0: controladorTriaje(); break;
+            case 1: controladorHistorias(); break;
+            case 2: controladorCitas(); break;
+            case 3: controladorHospital(); break;
+            case 4: controladorLaboratorio(); break;
+            case 5: 
+                limpiarAreaTrabajo();
+                gotoxy(30, 15); cout << "Cerrando sistema...";
+                return 0;
         }
-        
-        if(opcion != 0) pausar();
-
-    } while (opcion != 0);
-
+    }
     return 0;
 }

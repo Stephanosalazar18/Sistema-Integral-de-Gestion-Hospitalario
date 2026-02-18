@@ -6,45 +6,51 @@
 
 using namespace std;
 
-// Definimos un tamaño primo para reducir colisiones
+// Tamaño primo para reducir colisiones (Mantenemos la constante)
 const int TAM_TABLA = 97; 
 
-// Estructura de la Cita (Datos del PDF)
 struct Cita {
-    string idPaciente; // Cédula
+    // Datos del Proyecto (PDF)
+    string idPaciente; 
     string nombreMedico;
     string especialidad;
     Fecha fecha;
     Hora hora;
     string motivo;
+    
+    // Tu aporte: Auditoría
+    string fechaRegistro; // Hora real del sistema al crear la cita
     bool activa; 
 };
 
-// Nodo para la lista enlazada (Manejo de Colisiones)
 struct NodoCita {
     Cita datos;
     NodoCita* siguiente;
 };
 
-// La Tabla Hash es un arreglo de punteros (Cabeceras de listas)
 struct TablaHash {
-    NodoCita* tabla[TAM_TABLA]; // El arreglo principal
+    // Usamos tu nomenclatura de 'buckets' pero estática para facilitar la gestión de memoria
+    NodoCita* buckets[TAM_TABLA]; 
     int cantidadCitas;
 };
 
-// --- PROTOTIPOS DE FUNCIONES ---
+// --- PROTOTIPOS ---
 
 void inicializarTabla(TablaHash &t);
+string obtenerHoraServidor(); // Tu función
 
-// Función Hash (La fórmula matemática)
-int generarIndiceHash(string medico, Fecha f, Hora h); 
+// Tu algoritmo DJB2 adaptado a los datos de la Cita
+int funcionHashDJB2(string clave); 
+int generarIndice(string medico, Fecha f, Hora h);
 
 // Operaciones
 bool registrarCita(TablaHash &t, Cita nuevaCita);
 bool cancelarCita(TablaHash &t, string idPaciente, Fecha f, Hora h);
-void mostrarTodaLaAgenda(TablaHash t);
 
-// Validación
+// Tu visualización mejorada
+void mostrarTablaHash(TablaHash t); 
+
+// Validaciones
 bool existeChoqueHorario(TablaHash t, string medico, Fecha f, Hora h);
 
 #endif // CITAS_H
