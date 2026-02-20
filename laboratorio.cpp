@@ -1,6 +1,7 @@
 #include "laboratorio.h"
+#include "interfaz.h" // Necesario para gotoxy, color, limpiarAreaTrabajo
+#include <iomanip>
 
-// Helper para convertir Enum a Texto (útil para imprimir)
 string obtenerNombreExamen(TipoExamen tipo) {
     switch(tipo) {
         case HEMATOLOGIA: return "HEMATOLOGIA";
@@ -30,39 +31,21 @@ bool colaEstaLlena(ColaLaboratorio c) {
 }
 
 bool validarColaLaboratorio(ColaLaboratorio c, string cedula) {
-    
-    if (colaEstaVacia(c)) {
-        return false;
-    }
+    if (colaEstaVacia(c)) return false;
 
-    
     NodoLaboratorio* actual = c.ultimo->siguiente;
     NodoLaboratorio* primero = actual;
-
     do {
-        if (actual->datos.cedulaPaciente == cedula) {
-            return true; // ¡Encontrado!
-        }
-        
+        if (actual->datos.cedulaPaciente == cedula) return true;
         actual = actual->siguiente;
+    } while (actual != primero); 
 
-    } while (actual != primero); // Repetimos hasta volver al inicio
-
-    return false; // Dio la vuelta completa y no lo encontró
+    return false; 
 }
 
 bool encolarSolicitud(ColaLaboratorio &c, Examen ex) {
-    if (colaEstaLlena(c)) {
-        cout << "[ERROR] Cola llena." << endl;
-        return false;
-    }
-
-    // --- NUEVA VALIDACIÓN AGREGADA ---
-    if (validarColaLaboratorio(c, ex.cedulaPaciente)) {
-        cout << "[ERROR] El paciente " << ex.cedulaPaciente << " YA esta en la cola de espera." << endl;
-        return false;
-    }
-    // ---------------------------------
+    if (colaEstaLlena(c)) return false;
+    if (validarColaLaboratorio(c, ex.cedulaPaciente)) return false;
 
     NodoLaboratorio* nuevo = new NodoLaboratorio();
     nuevo->datos = ex;
@@ -77,84 +60,56 @@ bool encolarSolicitud(ColaLaboratorio &c, Examen ex) {
     }
 
     c.cantidad++;
-    cout << "Solicitud registrada correctamente." << endl;
     return true;
 }
 
-// Sacar de la Cola Circular (Desencolar)
 Examen desencolarSolicitud(ColaLaboratorio &c) {
-    Examen vacio; // Retorno dummy
+    Examen vacio; 
     if (colaEstaVacia(c)) return vacio;
 
-    // El nodo a sacar es el "primero" (ultimo->siguiente)
     NodoLaboratorio* nodoEliminar = c.ultimo->siguiente;
     Examen datosRetorno = nodoEliminar->datos;
 
     if (c.ultimo == nodoEliminar) {
-        // CASO: Solo quedaba un elemento
         c.ultimo = NULL;
     } else {
-        // CASO: Hay más elementos
-        // El último se salta al que vamos a eliminar y apunta al siguiente
         c.ultimo->siguiente = nodoEliminar->siguiente;
     }
 
-    delete nodoEliminar; // Liberamos memoria
+    delete nodoEliminar; 
     c.cantidad--;
     return datosRetorno;
 }
 
 void eliminarLaboratorio(ColaLaboratorio &c, string cedula) {
-    // 1. Validación inicial
-    if (colaEstaVacia(c)) {
-        cout << "[!] La cola esta vacia, no se puede eliminar." << endl;
-        return;
-    }
+    if (colaEstaVacia(c)) return;
 
-    NodoLaboratorio* actual = c.ultimo->siguiente; // Empezamos por el "primero" lógico
-    NodoLaboratorio* anterior = c.ultimo;          // El anterior al primero es el último
+    NodoLaboratorio* actual = c.ultimo->siguiente; 
+    NodoLaboratorio* anterior = c.ultimo;          
     bool encontrado = false;
 
-    // 2. Buscamos el nodo recorriendo el círculo
     do {
         if (actual->datos.cedulaPaciente == cedula) {
             encontrado = true;
-            break; // Dejamos de recorrer, 'actual' apunta al que queremos borrar
+            break; 
         }
-        
-        // Avanzamos punteros
         anterior = actual;
         actual = actual->siguiente;
+    } while (actual != c.ultimo->siguiente); 
 
-    } while (actual != c.ultimo->siguiente); // Repetir hasta volver al inicio
+    if (!encontrado) return;
 
-    // 3. Si no se encontró
-    if (!encontrado) {
-        cout << "[!] Paciente con cedula " << cedula << " no encontrado en la cola." << endl;
-        return;
-    }
-
-    // 4. Lógica de eliminación
     if (c.cantidad == 1) {
-        // CASO A: Era el único nodo
         c.ultimo = NULL;
-    } 
-    else {
-        // CASO B: Hay más nodos
-        
-        // Paso clave: Saltamos el nodo actual
+    } else {
         anterior->siguiente = actual->siguiente;
-
-        // CASO ESPECIAL: Si estamos borrando el que era marcado como 'ultimo'
         if (actual == c.ultimo) {
-            c.ultimo = anterior; // El 'ultimo' ahora es el anterior
+            c.ultimo = anterior; 
         }
     }
 
-    // 5. Liberar memoria
     delete actual;
     c.cantidad--;
-    cout << "[OK] Solicitud del paciente " << cedula << " eliminada exitosamente." << endl;
 }
 
 // =========================================================
@@ -173,54 +128,108 @@ bool pilaEstaVacia(PilaLaboratorio p) {
 void pushPila(PilaLaboratorio &p, Examen ex) {
     NodoLaboratorio* nuevo = new NodoLaboratorio();
     nuevo->datos = ex;
-
-    // Pila estándar: Nuevo apunta al tope actual
     nuevo->siguiente = p.tope;
-    // Tope se mueve al nuevo
     p.tope = nuevo;
-
     p.cantidad++;
 }
 
 void mostrarPila(PilaLaboratorio p) {
-    cout << "\n=== HISTORIAL DE RESULTADOS (PILA) ===" << endl;
+    int y = 5;
+    gotoxy(4, y++); color(COLOR_TITULO); cout << "=== HISTORIAL DE RESULTADOS (PILA LIFO) ==="; color(COLOR_TEXTO);
+    y++;
+
     if (pilaEstaVacia(p)) {
-        cout << "  (Vacia)" << endl;
-    } else {
-        NodoLaboratorio* actual = p.tope;
-        while (actual != NULL) {
-            cout << " [" << actual->datos.fechaSolicitud.dia << "/" << actual->datos.fechaSolicitud.mes << "] "
-                 << actual->datos.nombrePaciente << " - " 
-                 << obtenerNombreExamen(actual->datos.tipo) << endl;
-            cout << "  >> Resultado: " << actual->datos.resultado << endl;
-            cout << "---------------------------------------" << endl;
-            actual = actual->siguiente;
-        }
-    }
-    cout << "======================================\n" << endl;
-}
-
-// =========================================================
-//  PROCESAMIENTO (Conexión Cola -> Pila)
-// =========================================================
-
-void procesarExamen(ColaLaboratorio &cola, PilaLaboratorio &pilaResultados, string resultadoMedico) {
-    if (colaEstaVacia(cola)) {
-        cout << "[!] No hay solicitudes pendientes." << endl;
+        gotoxy(4, y++); color(8); cout << "(La pila de resultados esta vacia)"; color(COLOR_TEXTO);
         return;
     }
 
-    // 1. Sacamos al paciente más antiguo (FIFO) de la cola
-    Examen examen = desencolarSolicitud(cola);
+    NodoLaboratorio* actual = p.tope;
+    int contador = 0;
 
-    // 2. "Procesamos" (Agregamos el resultado)
+    while (actual != NULL) {
+        if (y > 23) { // Paginación
+            gotoxy(4, y+1); color(8); cout << "--- Presione ENTER para ver mas ---"; color(COLOR_TEXTO);
+            _getch();
+            limpiarAreaTrabajo(); y = 5;
+            gotoxy(4, y++); color(COLOR_TITULO); cout << "=== HISTORIAL DE RESULTADOS (Continuacion) ==="; color(COLOR_TEXTO); y++;
+        }
+
+        gotoxy(4, y++); color(COLOR_PANEL); 
+        cout << "[" << setfill('0') << setw(2) << actual->datos.fechaSolicitud.dia << "/" 
+             << setfill('0') << setw(2) << actual->datos.fechaSolicitud.mes << "/" 
+             << actual->datos.fechaSolicitud.anio << "] ";
+        color(COLOR_EXITO); cout << actual->datos.nombrePaciente; color(COLOR_TEXTO);
+        cout << " - " << obtenerNombreExamen(actual->datos.tipo);
+        
+        gotoxy(4, y++); cout << "   >> Resultado: " << actual->datos.resultado;
+        gotoxy(4, y++); color(8); cout << "--------------------------------------------------------"; color(COLOR_TEXTO);
+        
+        actual = actual->siguiente;
+        contador++;
+    }
+    gotoxy(4, y+1); cout << "Total procesados: " << contador;
+}
+
+// =========================================================
+//  PROCESAMIENTO (Cola -> Pila) & ESTADISTICAS
+// =========================================================
+
+void procesarExamen(ColaLaboratorio &cola, PilaLaboratorio &pilaResultados, string resultadoMedico) {
+    if (colaEstaVacia(cola)) return;
+
+    Examen examen = desencolarSolicitud(cola);
     examen.resultado = resultadoMedico;
     examen.procesado = true;
 
-    // 3. Guardamos en el historial (Pila)
     pushPila(pilaResultados, examen);
+}
 
-    cout << "\n>>> Examen PROCESADO con exito." << endl;
-    cout << "Paciente: " << examen.nombrePaciente << endl;
-    cout << "Resultado guardado en historial." << endl;
+void mostrarEstadisticasLaboratorio(PilaLaboratorio p, int d, int m, int a, int fTipo) {
+    int contHem = 0, contQui = 0, contImg = 0, contOri = 0, contHec = 0;
+    int totalFiltrado = 0;
+
+    NodoLaboratorio* actual = p.tope;
+    
+    // Recorrer la pila completa O(N)
+    while (actual != NULL) {
+        bool matchFecha = true;
+        bool matchTipo = true;
+
+        if (d != 0) {
+            if (actual->datos.fechaSolicitud.dia != d || actual->datos.fechaSolicitud.mes != m || actual->datos.fechaSolicitud.anio != a) matchFecha = false;
+        }
+        if (fTipo != -1) {
+            if ((int)actual->datos.tipo != fTipo) matchTipo = false;
+        }
+
+        if (matchFecha && matchTipo) {
+            totalFiltrado++;
+            switch(actual->datos.tipo) {
+                case HEMATOLOGIA: contHem++; break;
+                case QUIMICA: contQui++; break;
+                case IMAGENOLOGIA: contImg++; break;
+                case ORINA: contOri++; break;
+                case HECES: contHec++; break;
+            }
+        }
+        actual = actual->siguiente;
+    }
+
+    limpiarAreaTrabajo();
+    int y = 5;
+    gotoxy(5, y++); color(COLOR_TITULO); cout << "=== ESTADISTICAS DE LABORATORIO ==="; color(COLOR_TEXTO);
+    y++;
+    gotoxy(5, y++); color(8); cout << "Filtros aplicados:";
+    gotoxy(5, y++); cout << "- Fecha: " << (d == 0 ? "Global (Todas)" : to_string(d) + "/" + to_string(m) + "/" + to_string(a));
+    gotoxy(5, y++); cout << "- Tipo Examen: " << (fTipo == -1 ? "Todos" : obtenerNombreExamen((TipoExamen)fTipo));
+    color(COLOR_TEXTO); y++;
+
+    gotoxy(5, y++); color(COLOR_PANEL); cout << ">> EXAMENES PROCESADOS (En Pila):"; color(COLOR_TEXTO);
+    gotoxy(5, y++); cout << "- Hematologia:   " << contHem;
+    gotoxy(5, y++); cout << "- Quimica:       " << contQui;
+    gotoxy(5, y++); cout << "- Imagenologia:  " << contImg;
+    gotoxy(5, y++); cout << "- Uroanalisis:   " << contOri;
+    gotoxy(5, y++); cout << "- Coproanalisis: " << contHec;
+    y++;
+    gotoxy(5, y++); cout << "TOTAL COINCIDENCIAS: " << totalFiltrado;
 }

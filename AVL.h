@@ -2,7 +2,6 @@
 #define AVL_H
 
 #include "estructuras.h"
-#include <algorithm> 
 
 struct Nodo {
   Paciente dato;   // informacion del paciente
@@ -27,8 +26,8 @@ Nodo* rotacioneIzquierda(Nodo* x);
 Nodo* nuevoNodo(Paciente paciente);
 
 void insertarPaciente(Nodo* &raiz, Paciente paciente); // Paso por referencia de puntero
-void eliminarPacienteMayorPrioridad(Nodo* &raiz);      // Paso por referencia
+Paciente eliminarPacienteMayorPrioridad(Nodo* &raiz);    // Paso por referencia
 void mostrarArbol(Nodo* raiz, int tipoRecorrido);      // tipoRecorrido { 0:Pre, 1:In, 2:Post }
-
+bool existeEnAVL(Nodo* raiz, string cedula);
 
 #endif

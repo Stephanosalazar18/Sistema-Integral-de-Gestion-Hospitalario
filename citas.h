@@ -11,7 +11,8 @@ const int TAM_TABLA = 97;
 
 struct Cita {
     // Datos del Proyecto (PDF)
-    string idPaciente; 
+    string idPaciente;
+    string nombrePaciente; 
     string nombreMedico;
     string especialidad;
     Fecha fecha;
@@ -34,12 +35,11 @@ struct TablaHash {
     int cantidadCitas;
 };
 
-// --- PROTOTIPOS ---
 
 void inicializarTabla(TablaHash &t);
 string obtenerHoraServidor(); // Tu función
 
-// Tu algoritmo DJB2 adaptado a los datos de la Cita
+// algoritmo DJB2 adaptado a los datos de la Cita
 int funcionHashDJB2(string clave); 
 int generarIndice(string medico, Fecha f, Hora h);
 
@@ -52,5 +52,9 @@ void mostrarTablaHash(TablaHash t);
 
 // Validaciones
 bool existeChoqueHorario(TablaHash t, string medico, Fecha f, Hora h);
+bool pacienteTieneCita(TablaHash t, string idPaciente, Fecha f, Hora h); 
+
+void consultarCitasFiltradas(TablaHash t, int tipoFiltro, string filtroTexto, Fecha filtroF);
+void mostrarEstadisticasCitas(TablaHash t, Fecha fFiltro, string especialidadFiltro);
 
 #endif // CITAS_H

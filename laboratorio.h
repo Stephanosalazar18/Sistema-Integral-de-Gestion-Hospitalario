@@ -61,10 +61,10 @@ void mostrarPila(PilaLaboratorio p); // Muestra historial
 void eliminarLaboratorio(ColaLaboratorio &c, string cedula);
 
 // Lógica Principal
-// Mueve de la Cola -> Pila y asigna resultado
 void procesarExamen(ColaLaboratorio &cola, PilaLaboratorio &pilaResultados, string resultadoMedico);
-
-// Auxiliar para imprimir tipo de examen
 string obtenerNombreExamen(TipoExamen tipo);
+
+// Estadísticas (NUEVO)
+void mostrarEstadisticasLaboratorio(PilaLaboratorio p, int d, int m, int a, int fTipo);
 
 #endif // LABORATORIO_H

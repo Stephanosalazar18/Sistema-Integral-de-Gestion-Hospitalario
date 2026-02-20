@@ -2,7 +2,7 @@
 #include <iostream>
 
 using namespace std;
- 
+
 int obtenerAltura(Nodo* n) {
     if (n == NULL) return 0;
     return n->altura;
@@ -20,229 +20,155 @@ int obtenerBalance(Nodo* n) {
 Nodo* nuevoNodo(Paciente p) {
     Nodo* nodo = new Nodo();
     nodo->dato = p;
-    nodo->izq = NULL;  // Iniciar en NULL para evitar basura
-    nodo->der = NULL;  // Iniciar en NULL
+    nodo->izq = NULL;  
+    nodo->der = NULL;  
     nodo->altura = 1;
     return nodo;
 }
 
-// Rotaciones del diavl
-
 Nodo* rotacionDerecha(Nodo* y) {
     Nodo* x = y->izq;
     Nodo* T2 = x->der;
-
-    // realizando rotaciones
     x->der = y;
     y->izq = T2;
-
-    // actualizando alturas
     y->altura = mayor(obtenerAltura(y->izq), obtenerAltura(y->der)) + 1;
     x->altura = mayor(obtenerAltura(x->izq), obtenerAltura(x->der)) + 1;
-
     return x;
 }
 
 Nodo* rotacionIzquierda(Nodo* x) {
     Nodo* y = x->der;
     Nodo* T2 = y->izq;
-
-  // Realizando rotaciones
     y->izq = x;
     x->der = T2;
-
-  // Actualizando alturas
     x->altura = mayor(obtenerAltura(x->izq), obtenerAltura(x->der)) + 1;
     y->altura = mayor(obtenerAltura(y->izq), obtenerAltura(y->der)) + 1;
-
     return y;
 }
 
+// Función auxiliar para saber si una cédula ya existe en la sala de espera
+bool existeEnAVL(Nodo* raiz, string cedula) {
+    // Si llegamos a una hoja vacía, no se encontró
+    if (raiz == NULL) {
+        return false;
+    }
+    
+    // Si el nodo actual tiene la cédula, ¡existe!
+    if (raiz->dato.cedula == cedula) {
+        return true;
+    }
+    
+    // Buscamos en la rama izquierda y en la rama derecha
+    return existeEnAVL(raiz->izq, cedula) || existeEnAVL(raiz->der, cedula);
+}
 
+// Función auxiliar para saber quién tiene más prioridad
+bool esMasPrioritario(Paciente nuevo, Paciente actual) {
+    if (nuevo.urgencia < actual.urgencia) {
+        return true; // 0 (Critico) gana sobre 3 (Leve)
+    } 
+    else if (nuevo.urgencia == actual.urgencia) {
+        return nuevo.numLlegada < actual.numLlegada; // Si es igual, gana el que llegó antes (ticket menor)
+    }
+    return false;
+}
 
 Nodo* insertarRecursivo(Nodo* nodo, Paciente p) {
+    if (nodo == NULL) return nuevoNodo(p);
 
-     // 1. insercion normal de BST
-    if (nodo == NULL)
-        return nuevoNodo(p);
-
-    // Logica de prioridad
-     // "Menor valor" = "Mayor Prioridad" (izquierda)
-     // CRITICO (0) < LEVE (3), asi que los graves van a la izquierda
-
-
-    bool esMasUrgente = false;
-
-    if (p.urgencia < nodo->dato.urgencia) {
-        esMasUrgente = true; // tiene urgencia mas grave (0 < 2)
-
-    } 
-    else if (p.urgencia == nodo->dato.urgencia) {
-
-        // si son iguales, se decide por orden de llegada
-        if (p.numLlegada < nodo->dato.numLlegada) {
-            esMasUrgente = true;
-        }
-
-    }
-
-  // Decidir direccion basado en la prioridad
-    if (esMasUrgente) {
+    if (esMasPrioritario(p, nodo->dato)) {
         nodo->izq = insertarRecursivo(nodo->izq, p);
-
     } else {
         nodo->der = insertarRecursivo(nodo->der, p);
-
     }
 
-    // 2. actualizar altura de este nodo ancestro
     nodo->altura = 1 + mayor(obtenerAltura(nodo->izq), obtenerAltura(nodo->der));
-
-    // 3. Obtener balance para saber si hubo desbalanceo
     int balance = obtenerBalance(nodo);
 
-    //4. Si el nodo se desbalanceo, hay 4 casos
-    
-
-    //Caso Izquierda Izquierda, El nuevo nodo es mas urgente y se metio en el subarbol izquierdo del izquierdo
-    // comparamos los datos del paciente con el hijo izquierdo para saber donde cayo
-    if (balance > 1 && (p.urgencia < nodo->izq->dato.urgencia || 
-       (p.urgencia == nodo->izq->dato.urgencia && p.numLlegada < nodo->izq->dato.numLlegada))) {
+    // Casos de rotación simplificados y seguros
+    if (balance > 1 && esMasPrioritario(p, nodo->izq->dato)) {
         return rotacionDerecha(nodo);
     }
-
-    //Caso Derecha Derecha, el nuevo nodo es menos urgente y se fue a la derecha de la derecha
-    if (balance < -1 && (p.urgencia > nodo->der->dato.urgencia || 
-       (p.urgencia == nodo->der->dato.urgencia && p.numLlegada > nodo->der->dato.numLlegada))) {
+    if (balance < -1 && !esMasPrioritario(p, nodo->der->dato)) {
         return rotacionIzquierda(nodo);
     }
-
-    // Caso Izquierda Derecha, el nuevo nodo es mas urgente y se fue a la izquierda de la derecha
-    if (balance > 1 && (p.urgencia > nodo->izq->dato.urgencia || 
-       (p.urgencia == nodo->izq->dato.urgencia && p.numLlegada > nodo->izq->dato.numLlegada))) {
+    if (balance > 1 && !esMasPrioritario(p, nodo->izq->dato)) {
         nodo->izq = rotacionIzquierda(nodo->izq);
         return rotacionDerecha(nodo);
     }
-
-    // Caso Derecha Izquierda, el nuevo nodo es menos urgente y se fue a la izquierda de la izquierda
-    if (balance < -1 && (p.urgencia < nodo->der->dato.urgencia || 
-       (p.urgencia == nodo->der->dato.urgencia && p.numLlegada < nodo->der->dato.numLlegada))) {
+    if (balance < -1 && esMasPrioritario(p, nodo->der->dato)) {
         nodo->der = rotacionDerecha(nodo->der);
         return rotacionIzquierda(nodo);
     }
     
-    // Si no hubo desbalance, retornar el nodo tal cual
     return nodo;
-
-    // si esta mier** se mete en rotaciones infinitas, 
-    // APAGO OTTO
 }
-
 
 void insertarPaciente(Nodo* &raiz, Paciente p) {
     raiz = insertarRecursivo(raiz, p);
-    cout << "Insertado " << p.nombre << " (Prioridad: " << p.urgencia << ")" << endl;
+    // Eliminado el cout para no romper la interfaz gráfica
 }
 
-
-// Funcion recursiva para eliminar
 Nodo* eliminarRecursivo(Nodo* raiz, Paciente& paciente) {
-  if(raiz == NULL) return raiz;
+    if(raiz == NULL) return raiz;
 
-  if(raiz->izq != NULL) {
-    raiz->izq = eliminarRecursivo(raiz->izq, paciente);
-  } else {
-    // encontramos al candidato, la raiz actual no tiene izquierda
-    // Guardamos los datos para devolverlos
-    paciente = raiz->dato;
+    if(raiz->izq != NULL) {
+        raiz->izq = eliminarRecursivo(raiz->izq, paciente);
+    } else {
+        paciente = raiz->dato;
+        Nodo* aux = raiz->der;
+        delete raiz;
+        return aux;
+    }
 
-    // Caso 1, sin hijos o solo hijo derecho
-    // no puede tener hijo izq porque ya verificamos arriba esa vuelta 
-    Nodo* aux = raiz->der;
-    delete raiz;
-    return aux;
-  }
+    raiz->altura = 1 + mayor(obtenerAltura(raiz->izq), obtenerAltura(raiz->der));
+    int balance = obtenerBalance(raiz);
 
-  // actualizamos altura
-  raiz->altura = 1 + mayor(obtenerAltura(raiz->izq), obtenerAltura(raiz->der));
+    if(balance > 1 && obtenerBalance(raiz->izq) >= 0) return rotacionDerecha(raiz);
+    if(balance > 1 && obtenerBalance(raiz->izq) < 0) {
+        raiz->izq = rotacionIzquierda(raiz->izq);
+        return rotacionDerecha(raiz);
+    }
+    if(balance < -1 && obtenerBalance(raiz->der) <= 0) return rotacionIzquierda(raiz);
+    if(balance < -1 && obtenerBalance(raiz->der) > 0) {
+        raiz->der = rotacionDerecha(raiz->der);
+        return rotacionIzquierda(raiz);
+    }
 
-  // obtenemos el balance
-  int balance = obtenerBalance(raiz);
-
-  // Casos de rotacion(Rebalanceo al eliminar)
-  // Izquierda Izquierda
-  if(balance > 1 && obtenerBalance(raiz->izq) >= 0) {
-    return rotacionDerecha(raiz);
-  }
-
-  // Izquierda Derecha
-  if (balance > 1 && obtenerBalance(raiz->izq) < 0) {
-    raiz->izq = rotacionIzquierda(raiz->izq);
-    return rotacionDerecha(raiz);
-  }
-
-  // Derecha Derecha
-  if(balance < -1 && obtenerBalance(raiz->der) <= 0) {
-    return rotacionIzquierda(raiz);
-  }
-
-  // Derecha Izquierda
-  if(balance < -1 && obtenerBalance(raiz->der) > 0) {
-    raiz->der = rotacionDerecha(raiz->der);
-    return rotacionIzquierda(raiz);
-  }
-
-  return raiz;
+    return raiz;
 }
 
-
-
-void eliminarPacienteMayorPrioridad(Nodo* &raiz) {
-  if (raiz == NULL) {
-    cout << "No hay nodos a eliminar. " << endl;
-    return;
-  };
-
-  Paciente atendido;
-  raiz = eliminarRecursivo(raiz, atendido);
-
-  cout << "--- ATENDIENDO PACIENTE ---" << endl;
-  cout << "Nombre: " << atendido.nombre << endl;
-  cout << "Condicion: " << obtenerNombreUrgencia(atendido.urgencia) << endl;
-  cout << "---------------------------" << endl;
+Paciente eliminarPacienteMayorPrioridad(Nodo* &raiz) {
+    Paciente atendido;
+    if (raiz != NULL) {
+        // eliminarRecursivo busca al de mayor prioridad, lo borra y guarda sus datos en "atendido"
+        raiz = eliminarRecursivo(raiz, atendido); 
+    }
+    return atendido; // Devolvemos al paciente correcto al main
 }
 
 void mostrarArbol(Nodo* raiz, int tipoRecorrido) {
-    if (raiz != NULL) {
-        // INORDEN (I-R-D)
-        mostrarArbol(raiz->izq, tipoRecorrido);
-        cout << "[" << raiz->dato.urgencia << "] " << raiz->dato.nombre << endl;
-        mostrarArbol(raiz->der, tipoRecorrido);
+    if (raiz == NULL) return;
+
+    // PREORDEN: Raíz - Izquierda - Derecha (tipoRecorrido == 0)
+    if (tipoRecorrido == 0) {
+        cout << "      [Llegada: " << raiz->dato.numLlegada << "] CI: " << raiz->dato.cedula 
+             << " | " << raiz->dato.nombre << " (Nv: " << raiz->dato.urgencia << ")" << endl;
+    }
+
+    mostrarArbol(raiz->izq, tipoRecorrido);
+
+    // INORDEN: Izquierda - Raíz - Derecha (tipoRecorrido == 1)
+    if (tipoRecorrido == 1) {
+        cout << "      [Llegada: " << raiz->dato.numLlegada << "] CI: " << raiz->dato.cedula 
+             << " | " << raiz->dato.nombre << " (Nv: " << raiz->dato.urgencia << ")" << endl;
+    }
+
+    mostrarArbol(raiz->der, tipoRecorrido);
+
+    // POSTORDEN: Izquierda - Derecha - Raíz (tipoRecorrido == 2)
+    if (tipoRecorrido == 2) {
+        cout << "      [Llegada: " << raiz->dato.numLlegada << "] CI: " << raiz->dato.cedula 
+             << " | " << raiz->dato.nombre << " (Nv: " << raiz->dato.urgencia << ")" << endl;
     }
 }
-
-// Visualización del árbol
-// void mostrarArbol(Nodo* raiz, int tipoRecorrido) {
-//     if (raiz != NULL) {
-//         // 0: Preorden, 1: Inorden, 2: Postorden
-        
-//         if(tipoRecorrido == 0) { // Preorden (R-I-D)
-//             cout << "[" << obtenerNombreUrgencia(raiz->dato.urgencia) << "] " 
-//                  << raiz->dato.nombre << " (Llegada: " << raiz->dato.numLlegada << ")" << endl;
-//         }
-        
-//         mostrarArbol(raiz->izq, tipoRecorrido);
-        
-//         if(tipoRecorrido == 1) { // Inorden (I-R-D) -> Mostrará ordenado por prioridad
-//              cout << "[" << obtenerNombreUrgencia(raiz->dato.urgencia) << "] " 
-//                  << raiz->dato.nombre << " (Llegada: " << raiz->dato.numLlegada << ")" << endl;
-//         }
-        
-//         mostrarArbol(raiz->der, tipoRecorrido);
-        
-//         if(tipoRecorrido == 2) { // Postorden (I-D-R)
-//              cout << "[" << obtenerNombreUrgencia(raiz->dato.urgencia) << "] " 
-//                  << raiz->dato.nombre << " (Llegada: " << raiz->dato.numLlegada << ")" << endl;
-//         }
-//     }
-// }

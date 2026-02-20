@@ -46,7 +46,6 @@ void agregarConsulta(Expediente* exp, Fecha f, string diag, string trat, string 
     nuevo->siguiente = NULL;
     
     insertarNodoGenerico(exp, nuevo);
-    cout << " [HISTORIA] Consulta registrada." << endl;
 }
 
 void agregarIngreso(Expediente* exp, Fecha f, string habitacion, string motivo) {
@@ -61,7 +60,6 @@ void agregarIngreso(Expediente* exp, Fecha f, string habitacion, string motivo) 
     nuevo->siguiente = NULL;
 
     insertarNodoGenerico(exp, nuevo);
-    cout << " [HISTORIA] Ingreso registrado." << endl;
 }
 
 void agregarResultadoLab(Expediente* exp, Fecha f, string tipoEx, string resultado) {
@@ -76,7 +74,6 @@ void agregarResultadoLab(Expediente* exp, Fecha f, string tipoEx, string resulta
     nuevo->siguiente = NULL;
 
     insertarNodoGenerico(exp, nuevo);
-    cout << " [HISTORIA] Examen registrado." << endl;
 }
 
 void agregarAlta(Expediente* exp, Fecha f, string resumen, string indicaciones) {
@@ -91,7 +88,6 @@ void agregarAlta(Expediente* exp, Fecha f, string resumen, string indicaciones) 
     nuevo->siguiente = NULL;
 
     insertarNodoGenerico(exp, nuevo);
-    cout << " [HISTORIA] Alta registrada." << endl;
 }
 
 // --- VISUALIZACION ---
@@ -161,4 +157,41 @@ NodoHistoria* buscarRegistroPorFecha(NodoHistoria* actual, Fecha fBusqueda) {
     }
     
     return buscarRegistroPorFecha(actual->siguiente, fBusqueda);
+}
+
+bool modificarRegistro(Expediente* exp, Fecha fBusqueda, string nuevoDiag, string nuevoTrat, string nuevaObs) {
+    NodoHistoria* nodo = buscarRegistroPorFecha(exp->inicio, fBusqueda);
+    
+    if (nodo != NULL) {
+        // Solo modificamos campos clínicos, respetamos la fecha y el tipo (Requisito 2.e)
+        if(nuevoDiag != "") nodo->diagnostico = nuevoDiag;
+        if(nuevoTrat != "") nodo->tratamiento = nuevoTrat;
+        if(nuevaObs != "") nodo->observaciones = nuevaObs;
+        return true;
+    }
+    return false;
+}
+
+bool eliminarRegistro(Expediente* exp, Fecha fBusqueda) {
+    NodoHistoria* nodo = buscarRegistroPorFecha(exp->inicio, fBusqueda);
+    
+    if (nodo == NULL) return false;
+
+    // 1. Desconectar del nodo anterior
+    if (nodo->anterior != NULL) {
+        nodo->anterior->siguiente = nodo->siguiente;
+    } else {
+        exp->inicio = nodo->siguiente; // Si era el primero, el inicio ahora es el siguiente
+    }
+
+    // 2. Desconectar del nodo siguiente
+    if (nodo->siguiente != NULL) {
+        nodo->siguiente->anterior = nodo->anterior;
+    } else {
+        exp->fin = nodo->anterior; // Si era el último, el fin ahora es el anterior
+    }
+
+    // 3. Liberar memoria
+    delete nodo;
+    return true;
 }

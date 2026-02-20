@@ -68,9 +68,14 @@ void agregarResultadoLab(Expediente* exp, Fecha f, string tipoEx, string resulta
 void agregarAlta(Expediente* exp, Fecha f, string resumen, string indicaciones);
 
 // Visualización
+string tipoEventoStr(TipoEvento t);
 void mostrarHistoriaClinica(Expediente* exp);
 
 // Búsqueda
 NodoHistoria* buscarRegistroPorFecha(NodoHistoria* actual, Fecha fBusqueda);
+
+// Gestión de Nodos
+bool modificarRegistro(Expediente* exp, Fecha fBusqueda, string nuevoDiag, string nuevoTrat, string nuevaObs);
+bool eliminarRegistro(Expediente* exp, Fecha fBusqueda);
 
 #endif // HISTORIA_H
