@@ -1,3 +1,12 @@
+// Sistema Integral de Gestion Hospitalaria (S.I.G.H.)
+// Versión(Final)
+// compilar
+// g++ main.cpp AVL.cpp laboratorio.cpp citas.cpp hospital.cpp historia.cpp -o sistema_hospital 
+
+
+
+
+
 #include <iostream>
 #include <vector>
 #include <string>
